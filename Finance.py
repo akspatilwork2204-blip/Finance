@@ -8,7 +8,7 @@ st.set_page_config(page_title="Finance Tracker", layout="wide")
 st.title("💰 Finance Contribution & Loan Tracker")
 
 # 🔹 Default local file path
-DEFAULT_PATH = "/Users/saaaga/Downloads/codeBase/Finance.xlsx"
+DEFAULT_PATH = "Finance.xlsx"
 
 
 # =====================================================
