@@ -31,7 +31,6 @@ else:
         st.stop()
     file_source = uploaded_file
 
-
 # =====================================================
 # LOAD CONTRIBUTION SHEET
 # =====================================================
@@ -55,11 +54,9 @@ def load_contribution(file):
 
     df = df.dropna(subset=[headers[0]])
     df = df[df[headers[0]].astype(str).str.strip() != ""]
-
-  df = df.rename(columns={headers[0]: "Name"})
+    df = df.rename(columns={headers[0]: "Name"})
 
     return df.reset_index(drop=True)
-
 
 # =====================================================
 # LOAD LOAN SHEET
@@ -87,7 +84,7 @@ def load_loans(file):
 
     df = df.rename(columns=rename_map)
 
- df = df.dropna(subset=["Name"])
+    df = df.dropna(subset=["Name"])
     df = df[df["Name"].astype(str).str.strip() != ""]
     df = df[df["Name"] != "Name"]
 
@@ -132,7 +129,8 @@ for _, row in loan_df.iterrows():
         col = f"Month_{i}"
         if col in loan_df.columns:
             row_data[col] = row[col]
- loan_rows.append(row_data)
+
+    loan_rows.append(row_data)
 
 final_loan_df = pd.DataFrame(loan_rows)
 
@@ -142,4 +140,3 @@ st.success("✅ Data loaded successfully")
 
 
 
-    df = df.rename(columns={headers[0]: "Name"})
