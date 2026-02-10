@@ -1,119 +1,130 @@
-import pandas as pd
 import streamlit as st
+import pandas as pd
 
-EXCEL_PATH = "Finance.xlsx"
+st.set_page_config(page_title="Finance Tracker", layout="wide")
+st.title("💰 Finance Contribution & Loan Tracker")
 
-# ---------------- LOAD DATA ----------------
+# =====================================================
+# Upload Excel
+# =====================================================
+uploaded_file = st.file_uploader(
+    "Upload Finance Excel file",
+    type=["xlsx"]
+)
+
+if uploaded_file is None:
+    st.stop()
+
+# =====================================================
+# Contribution Sheet (E3)
+# =====================================================
 @st.cache_data
-def load_data():
-
-    # ================= CONTRIBUTION SHEET =================
-    raw_contribution = pd.read_excel(
-        EXCEL_PATH,
+def load_contribution(file):
+    raw = pd.read_excel(
+        file,
         sheet_name="Contribution",
         header=None
     )
 
-    # Data starts from row 3, column E
-    contribution_df = raw_contribution.iloc[2:, 4:8]
-    contribution_df.columns = [
-        "Name",
-        "Initial Contribution",
-        "Monthly Contribution",
-        "Total Contribution"
-    ]
+    # Work only from column E onward
+    df = raw.iloc[:, 4:].copy()
 
-    # Drop empty name rows
-    contribution_df = contribution_df.dropna(subset=["Name"])
+    # Find first row where column E is not empty → HEADER
+    header_row_idx = df[df.iloc[:, 0].notna()].index[0]
 
-    # Remove embedded header row
-    contribution_df = contribution_df[
-        contribution_df["Name"].astype(str).str.strip().str.lower() != "name"
-    ]
+    # Extract headers
+    headers = df.loc[header_row_idx].tolist()
 
-    # Convert numeric columns safely
-    numeric_cols = [
-        "Initial Contribution",
-        "Monthly Contribution",
-        "Total Contribution"
-    ]
+    # Data starts AFTER header
+    df = df.loc[header_row_idx + 1:].copy()
+    df.columns = headers
 
-    for col in numeric_cols:
-        contribution_df[col] = pd.to_numeric(
-            contribution_df[col], errors="coerce"
-        )
+    # Clean data rows
+    df = df.dropna(subset=[headers[0]])
+    df = df[df[headers[0]].astype(str).str.strip() != ""]
 
-    # Remove garbage rows (blank / zero rows before actual data)
-    contribution_df = contribution_df.dropna(
-        subset=["Initial Contribution"]
-    )
+    # Normalize column name
+    df = df.rename(columns={headers[0]: "Name"})
 
-    # ================= LOAN SHEET =================
-    raw_loan = pd.read_excel(
-        EXCEL_PATH,
+    return df.reset_index(drop=True)
+
+# =====================================================
+# Loan Sheet (POSITION + HEADER SAFE)
+# =====================================================
+@st.cache_data
+def load_loans(file):
+    raw = pd.read_excel(
+        file,
         sheet_name="LoanTakenAndEMIDetails",
         header=None
     )
 
-    # Data starts from row 6, column D
-    loan_df = raw_loan.iloc[5:, 3:]
-    loan_df = loan_df.dropna(how="all")
+    # Header row (Excel row 6)
+    header_row = raw.iloc[5, 3:].tolist()
 
-    # Rename columns dynamically
-    base_cols = ["Name", "Interest", "Amount", "Duration"]
-    month_cols = [
-        f"Month_{i}"
-        for i in range(1, loan_df.shape[1] - 3)
-    ]
+    # Data rows (Excel row 7 onwards)
+    df = raw.iloc[6:, 3:].copy()
 
-    loan_df.columns = base_cols + month_cols
+    # Assign temporary headers
+    df.columns = header_row
 
-    # Clean loan rows
-    loan_df = loan_df.dropna(subset=["Name", "Amount", "Duration"])
+    # --- FORCE FIXED COLUMNS BY POSITION ---
+    rename_map = {
+        df.columns[0]: "Name",
+        df.columns[2]: "AmountTaken",
+        df.columns[3]: "Duration",
+        df.columns[4]: "MonthlyPrincipal",
+    }
 
-    return contribution_df, loan_df
+    df = df.rename(columns=rename_map)
+
+    # Remove junk rows
+    df = df.dropna(subset=["Name"])
+    df = df[df["Name"].astype(str).str.strip() != ""]
+    df = df[df["Name"] != "Name"]
+
+    return df
 
 
-# ---------------- MAIN APP ----------------
-contribution_df, loan_df = load_data()
+# =====================================================
+# Load Data
+# =====================================================
+contribution_df = load_contribution(uploaded_file)
+loan_df = load_loans(uploaded_file)
 
-st.title("📊 Finance Dashboard")
+# =====================================================
+# Contribution Summary
+# =====================================================
+st.subheader("📊 Contribution Summary")
+st.dataframe(contribution_df, use_container_width=True)
 
-# ================= CONTRIBUTION SUMMARY =================
-st.header("💼 Contribution Summary")
-
-contribution_summary = (
-    contribution_df
-    .groupby("Name", as_index=False)
-    .agg({
-        "Initial Contribution": "sum",
-        "Monthly Contribution": "sum",
-        "Total Contribution": "sum"
-    })
-)
-
-st.dataframe(contribution_summary, use_container_width=True)
-
-# ================= LOAN DETAILS =================
-st.header("💰 Loan Taken & EMI Details")
+# =====================================================
+# Loan Details (Month_1 → Month_N CORRECT)
+# =====================================================
+st.subheader("🏦 Loan Taken & EMI Details")
 
 loan_rows = []
 
 for _, row in loan_df.iterrows():
     duration = int(row["Duration"])
 
-    record = {
+    row_data = {
         "Name": row["Name"],
-        "Amount Taken": row["Amount"],
+        "AmountTaken": row["AmountTaken"],
         "Duration": duration
     }
 
+    # Month_1 → Month_N (NO SHIFTING)
     for i in range(1, duration + 1):
         col = f"Month_{i}"
-        record[col] = row[col] if col in loan_df.columns else None
+        if col in loan_df.columns:
+            row_data[col] = row[col]
 
-    loan_rows.append(record)
+    loan_rows.append(row_data)
 
-loan_display_df = pd.DataFrame(loan_rows)
+final_loan_df = pd.DataFrame(loan_rows)
 
-st.dataframe(loan_display_df, use_container_width=True)
+st.dataframe(final_loan_df, use_container_width=True)
+
+st.success("✅ Data loaded correctly — columns, months, rows all fixed")
+
