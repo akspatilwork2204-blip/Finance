@@ -77,9 +77,9 @@ def load_loans(file):
     # Force fixed columns by position
     rename_map = {
         df.columns[0]: "Name",
-        df.columns[1]: "AmountTaken",
-        df.columns[2]: "Duration",
-        df.columns[3]: "MonthlyPrincipal",
+        df.columns[1]: "InterestToBePaid",
+        df.columns[2]: "AmountTaken",
+        df.columns[3]: "Duration",
     }
 
     df = df.rename(columns=rename_map)
