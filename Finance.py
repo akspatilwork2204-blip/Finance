@@ -27,21 +27,23 @@ def load_data():
     contribution_df = contribution_df.dropna(subset=["Name"])
 
     # Remove embedded header row
-     contribution_df = contribution_df[
+    contribution_df = contribution_df[
         contribution_df["Name"].astype(str).str.strip().str.lower() != "name"
     ]
 
     # Convert numeric columns safely
-    for col in [
+    numeric_cols = [
         "Initial Contribution",
         "Monthly Contribution",
         "Total Contribution"
-    ]:
+    ]
+
+    for col in numeric_cols:
         contribution_df[col] = pd.to_numeric(
             contribution_df[col], errors="coerce"
         )
 
-    # Remove garbage rows (row 4 & 5 in your Excel)
+    # Remove garbage rows (blank / zero rows before actual data)
     contribution_df = contribution_df.dropna(
         subset=["Initial Contribution"]
     )
@@ -52,7 +54,8 @@ def load_data():
         sheet_name="LoanTakenAndEMIDetails",
         header=None
     )
-       # Data starts from row 6, column D
+
+    # Data starts from row 6, column D
     loan_df = raw_loan.iloc[5:, 3:]
     loan_df = loan_df.dropna(how="all")
 
@@ -62,6 +65,7 @@ def load_data():
         f"Month_{i}"
         for i in range(1, loan_df.shape[1] - 3)
     ]
+
     loan_df.columns = base_cols + month_cols
 
     # Clean loan rows
@@ -70,8 +74,9 @@ def load_data():
     return contribution_df, loan_df
 
 
-    contribution_df, loan_df = load_data()
-# ---------------- STREAMLIT UI ----------------
+# ---------------- MAIN APP ----------------
+contribution_df, loan_df = load_data()
+
 st.title("📊 Finance Dashboard")
 
 # ================= CONTRIBUTION SUMMARY =================
@@ -89,8 +94,9 @@ contribution_summary = (
 
 st.dataframe(contribution_summary, use_container_width=True)
 
-# ================= LOAN & EMI DETAILS =================
+# ================= LOAN DETAILS =================
 st.header("💰 Loan Taken & EMI Details")
+
 loan_rows = []
 
 for _, row in loan_df.iterrows():
